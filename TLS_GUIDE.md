@@ -1,8 +1,8 @@
-# GAPIC Showcase: TLS Guide
+# GAPIC Showcase: TLS & Post-Quantum Cryptography (PQC) Guide
 
 This guide explains how to configure, run, and connect to the GAPIC Showcase server using TLS.
 
-For most use cases, **Auto-TLS** is the recommended mode as it requires zero configuration. Generating certificates manually via OpenSSL is only necessary if you need to test **Mutual TLS (mTLS)**.
+For most use cases (including verifying PQC), **Auto-TLS** is the recommended mode as it requires zero configuration. Generating certificates manually via OpenSSL is only necessary if you need to test **Mutual TLS (mTLS)**.
 
 ## 1. Running the Server with Auto-TLS (Recommended)
 
@@ -67,3 +67,39 @@ Provide the server cert, key, **and the CA cert** (which the server will use to 
 ```
 *The server log will confirm:* `Configured server with Mutual TLS (mTLS)`
 
+## 3. Verifying Post-Quantum Cryptography (PQC)
+
+When running on **Go 1.24+**, the hybrid post-quantum key exchange **`X25519MLKEM768`** is enabled by default.
+
+### Controlling PQC
+
+You can control PQC key exchanges either from the client side (via environment variables) or from the server side (via command-line flags).
+
+#### Client-Side Control (GODEBUG)
+You can explicitly disable or enable the ML-KEM key exchange on the client using the `GODEBUG` environment variable:
+
+*   **Force Disable PQC (Fallback to classical):**
+    ```sh
+    GODEBUG=tlsmlkem=0 go run client.go
+    ```
+*   **Enable PQC (Default in Go 1.24+):**
+    ```sh
+    GODEBUG=tlsmlkem=1 go run client.go
+    ```
+
+#### Server-Side Control (Flag)
+You can force the server to disable all Post-Quantum hybrid key exchanges and use only classical cryptography by starting the server with the `--disable-pqc` flag:
+
+```sh
+./gapic-showcase run \
+  --tls-cert certs/server.crt \
+  --tls-key certs/server.key \
+  --disable-pqc
+```
+
+## 4. Exposed TLS Response Metadata (Headers)
+
+When a client connects securely, the Showcase server automatically injects the following metadata into the gRPC response headers (and HTTP headers):
+
+*   **`x-showcase-tls-group`**: The negotiated key-exchange group (e.g., `X25519MLKEM768`).
+*   **`x-showcase-tls-client-supported-groups`**: A comma-separated list of all key-exchange groups the client offered in its `ClientHello` handshake, ordered by the client's preference.

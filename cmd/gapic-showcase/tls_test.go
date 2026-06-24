@@ -28,9 +28,11 @@ import (
 
 	"github.com/googleapis/gapic-showcase/client"
 	pb "github.com/googleapis/gapic-showcase/server/genproto"
+	"github.com/googleapis/gax-go/v2"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 )
 
 func TestConnectWithTLS(t *testing.T) {
@@ -97,7 +99,8 @@ func TestConnectWithTLS(t *testing.T) {
 		},
 	}
 
-	resp, err := c.Echo(ctx, req)
+	var header metadata.MD
+	resp, err := c.Echo(ctx, req, gax.WithGRPCOptions(grpc.Header(&header)))
 	if err != nil {
 		t.Fatalf("Echo call failed: %v", err)
 	}
@@ -105,4 +108,30 @@ func TestConnectWithTLS(t *testing.T) {
 	if resp.GetContent() != content {
 		t.Errorf("expected %q, got %q", content, resp.GetContent())
 	}
+
+	// 5. Assertions on Negotiated TLS Parameters
+	assertHeader(t, header, "x-showcase-tls-group", "X25519MLKEM768") // Default Go 1.25 PQC group
+
+	clientGroups := header.Get("x-showcase-tls-client-supported-groups")
+	if len(clientGroups) == 0 {
+		t.Fatalf("missing header: x-showcase-tls-client-supported-groups")
+	}
+	t.Logf("Client supported groups received: %s", clientGroups[0])
+
+	if !strings.Contains(clientGroups[0], "X25519MLKEM768") {
+		t.Errorf("expected client supported groups to contain X25519MLKEM768, got %q", clientGroups[0])
+	}
 }
+func assertHeader(t *testing.T, md metadata.MD, key, expected string) {
+	t.Helper()
+	val := md.Get(key)
+	if len(val) == 0 {
+		t.Errorf("missing header: %s", key)
+		return
+	}
+	t.Logf("Header %s: %s", key, val[0])
+	if val[0] != expected {
+		t.Errorf("header %s: expected %q, got %q", key, expected, val[0])
+	}
+}
+
