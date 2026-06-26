@@ -98,7 +98,11 @@ func init() {
 		"mtls-key",
 		"",
 		"The server private key path for custom mutual TLS channel. (Deprecated: use tls-key)")
-
+	runCmd.Flags().BoolVar(
+		&config.disablePQC,
+		"disable-pqc",
+		false,
+		"Disable Post-Quantum Cryptography (PQC) hybrid key exchanges.")
 	runCmd.Flags().BoolVar(
 		&config.autoTLS,
 		"tls",
